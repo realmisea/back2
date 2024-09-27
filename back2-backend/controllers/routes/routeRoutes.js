@@ -1,9 +1,11 @@
 const express = require('express');
-const { fetchRoute } = require('../controllers/routeController');
-
+const { getRoute, getRestStops } = require('../controllers/routeController');
 const router = express.Router();
 
-// 경로 정보를 요청하는 엔드포인트
-router.get('/route', fetchRoute);
+// 경로 계산 API
+router.post('/route', getRoute);
+
+// 휴게소 정보 API
+router.get('/rest-stops/:highwayCode', getRestStops);
 
 module.exports = router;
