@@ -1,11 +1,11 @@
 const express = require('express');
-const { getWeatherFromKMA, getAirQuality } = require('../controllers/weatherController');
+const { getRoute, getRestStops } = require('../controllers/routeController');
 const router = express.Router();
 
-// 날씨 정보 API
-router.get('/weather/:location', getWeatherFromKMA);
+// 경로 계산 API
+router.post('/route', getRoute);
 
-// 공기질 정보 API
-router.get('/air-quality/:location', getAirQuality);
+// 휴게소 정보 API
+router.get('/rest-stops/:highwayCode', getRestStops);
 
 module.exports = router;
