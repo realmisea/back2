@@ -57,6 +57,7 @@ const getDetailedWeather = async (req, res) => {
         res.status(200).json(detailedWeather);
 
     } catch (error) {
+        console.error('Error:', error.message); // 오류 메시지를 콘솔에 출력
         res.status(500).json({ message: '상세 날씨 정보를 불러오는 데 실패했습니다.', error: error.message });
     }
 };
