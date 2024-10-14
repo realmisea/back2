@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-// 하늘 상태 변환 함수 (아이콘 상태 전달을 위한 간단한 함수)
+// 하늘 상태 변환 함수
 const getSkyCondition = (skyCode) => {
     if (skyCode === 1 || skyCode === 2) {
         return 'clear'; // 맑음 또는 구름조금
@@ -19,15 +19,15 @@ const getSimpleWeather = async (req, res) => {
     const [latitude, longitude] = location.split(',');
 
     try {
-        // 기상청 API 호출 (기온, 강수 확률, 하늘 상태 등)
+        // 기상청 API 호출
         const weatherResponse = await axios.get(`https://api.weather.com/v3/wx/conditions/current?geocode=${latitude},${longitude}&language=ko-KR&format=json&apiKey=${process.env.KMA_API_KEY}`);
         const weatherData = weatherResponse.data;
 
-        // 에어코리아 API 호출 (대기질 정보)
+        // 에어코리아 API 호출
         const airQualityResponse = await axios.get(`http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?stationName=YOUR_STATION_NAME&dataTerm=DAILY&pageNo=1&numOfRows=1&serviceKey=${process.env.AIRKOREA_API_KEY}&returnType=json`);
         const airQualityData = airQualityResponse.data.response.body.items[0];
 
-        // 하늘 상태 코드 처리 (1: 맑음, 3: 구름많음, 4: 흐림)
+        // 하늘 상태 코드 처리
         const skyCondition = getSkyCondition(weatherData.sky);
 
         // 팁 제공 로직
@@ -39,11 +39,11 @@ const getSimpleWeather = async (req, res) => {
         // 간단한 날씨 정보 구성
         const simpleWeatherDetails = {
             location: location,
-            temperature: weatherData.temperature, // 현재 기온
-            precipitation_probability: weatherData.precipitationProbability, // 강수 확률
-            air_quality_level: airQualityData.khaiGrade, // 통합 대기 수준
-            sky_condition: skyCondition, // 하늘 상태
-            tips // 조건에 따른 팁
+            temperature: weatherData.temperature,
+            precipitation_probability: weatherData.precipitationProbability,
+            air_quality_level: airQualityData.khaiGrade,
+            sky_condition: skyCondition,
+            tips
         };
 
         res.status(200).json(simpleWeatherDetails);
@@ -59,15 +59,15 @@ const getDetailedWeather = async (req, res) => {
     const [latitude, longitude] = location.split(',');
 
     try {
-        // 기상청 API 시간대별 호출 (시간대별 기온, 강수량, 하늘 상태)
+        // 기상청 API 시간대별 호출
         const hourlyWeatherResponse = await axios.get(`https://api.weather.com/v3/wx/forecast/hourly?geocode=${latitude},${longitude}&format=json&apiKey=${process.env.KMA_API_KEY}`);
         const hourlyWeatherData = hourlyWeatherResponse.data;
 
-        // 에어코리아 API 호출 (대기질 정보)
+        // 에어코리아 API 호출
         const airQualityResponse = await axios.get(`http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty?stationName=YOUR_STATION_NAME&dataTerm=DAILY&pageNo=1&numOfRows=1&serviceKey=${process.env.AIRKOREA_API_KEY}&returnType=json`);
         const airQualityData = airQualityResponse.data.response.body.items[0];
 
-        // 시간대별 상세 날씨 정보 구성 (기온, 강수량, 하늘 상태, 대기질)
+        // 시간대별 상세 날씨 정보 구성
         const detailedWeather = {
             location: location,
             hourly: hourlyWeatherData.hourlyTemperature.map((temp, index) => ({
@@ -75,14 +75,14 @@ const getDetailedWeather = async (req, res) => {
                 temperature: temp,
                 precipitation: hourlyWeatherData.hourlyPrecipitation[index],
                 sky_condition: getSkyCondition(hourlyWeatherData.hourlySky[index]), // 시간대별 하늘 상태
-                air_quality_level: airQualityData.khaiGrade // 통합 대기 수준
+                air_quality_level: airQualityData.khaiGrade // 대기질 수준
             }))
         };
 
         res.status(200).json(detailedWeather);
 
     } catch (error) {
-        console.error('Error:', error.message); // 오류 메시지를 콘솔에 출력
+        console.error('Error:', error.message);
         res.status(500).json({ message: '상세 날씨 정보를 불러오는 데 실패했습니다.', error: error.message });
     }
 };
