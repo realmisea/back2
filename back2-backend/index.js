@@ -32,18 +32,37 @@ app.get('/rest-area', async (req, res) => {
     try {
         const response = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
             params: {
-                key: process.env.HIGHWAY_API_KEY, // 새로운 키 사용
-                type: 'json',  // JSON 형식으로 응답 받기
-                numOfRows: 5,  // 한 페이지에 5개 출력
-                pageNo: 1      // 첫 페이지 요청
+                key: process.env.HIGHWAY_API_KEY,
+                type: 'json',
+                serviceAreaName: '가평휴게소',
+                pageNo: 1,
+                numOfRows: 5
             }
         });
-        res.status(200).json(response.data);
+
+        // 응답 데이터 콘솔에 출력
+        console.log('휴게소 API 응답 데이터:', response.data);
+
+        // 응답 데이터가 list 배열인지 확인
+        if (response.data && Array.isArray(response.data.list)) {
+            const restAreas = response.data.list.map(area => ({
+                name: area.unitName,
+                coordinates: {
+                    x: area.xValue,
+                    y: area.yValue
+                }
+            }));
+
+            res.status(200).json(restAreas);
+        } else {
+            res.status(500).json({ message: '응답 데이터가 list 배열이 아닙니다.', data: response.data });
+        }
     } catch (error) {
         console.error('휴게소 API 요청 오류:', error.response ? error.response.data : error.message);
         res.status(500).json({ message: '휴게소 API 요청 실패', error: error.message });
     }
 });
+
 
 const PORT = 5173;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
