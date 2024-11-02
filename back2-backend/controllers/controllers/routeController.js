@@ -21,55 +21,50 @@ const getRouteWeather = async (req, res) => {
     const points = calculateIntermediatePoints(start, end);
 
     try {
-        const weatherData = await Promise.all(
-            points.map(async (point) => {
-                // 한국도로공사 API를 사용해 1/3, 2/3 지점 근처 휴게소 검색
-                const restAreaResponse = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
-                    params: {
-                        key: process.env.HIGHWAY_API_KEY,
-                        type: 'json',
-                        xValue: point.lon,
-                        yValue: point.lat,
-                        radius: 5000 // 5km 반경 내 휴게소 검색
-                    }
-                });
+        const weatherData = [];
 
-                const restArea = restAreaResponse.data.list[0]; // 가장 가까운 휴게소 선택
+        for (const point of points) {
+            const restAreaResponse = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
+                params: {
+                    key: process.env.HIGHWAY_API_KEY,
+                    type: 'json',
+                    xValue: point.lon,
+                    yValue: point.lat,
+                    radius: 2000 // 2km 반경 내 휴게소 검색으로 조정
+                }
+            });
 
-                // 기상청 API로 해당 좌표의 날씨 정보 가져오기
-                const weatherResponse = await axios.get(`http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst`, {
-                    params: {
-                        serviceKey: '08ShZLU9W1ERnmtAAHGoWoVoaSo8Y7xLxEjrjm6pBo%2FFR9mhWCod9CeRKrpTdrACHSWnuCernkvYQjqQmuwHvg%3D%3D',
-                        numOfRows: 100,
-                        pageNo: 1,
-                        dataType: 'XML',
-                        base_date: '20231014', // 날짜 업데이트 필요
-                        base_time: '0600', // 시간 업데이트 필요
-                        nx: restArea.xValue, // x 좌표
-                        ny: restArea.yValue // y 좌표
-                    }
-                });
+            const restAreas = restAreaResponse.data.list;
+            const restArea = restAreas.find((ra) => {
+                return !weatherData.some(wd => wd.restAreaName === ra.unitName);
+            }) || restAreas[0]; // 중복되지 않는 휴게소가 없으면 첫 번째 선택
 
-                // 날씨 응답 데이터 확인
-                console.log('Weather Response:', weatherResponse.data);
+            const weatherResponse = await axios.get(`http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst`, {
+                params: {
+                    serviceKey: '08ShZLU9W1ERnmtAAHGoWoVoaSo8Y7xLxEjrjm6pBo%2FFR9mhWCod9CeRKrpTdrACHSWnuCernkvYQjqQmuwHvg%3D%3D',
+                    numOfRows: 100,
+                    pageNo: 1,
+                    dataType: 'XML',
+                    base_date: '20231014', // 날짜 업데이트 필요
+                    base_time: '0600', // 시간 업데이트 필요
+                    nx: restArea.xValue, // x 좌표
+                    ny: restArea.yValue // y 좌표
+                }
+            });
 
-                // XML을 JavaScript 객체로 변환
-                const xmlDoc = new DOMParser().parseFromString(weatherResponse.data, "text/xml");
-
-                // 필요한 데이터를 추출
-                const items = Array.from(xmlDoc.getElementsByTagName("item")).map(item => {
-                    return {
-                        category: item.getElementsByTagName("category")[0].textContent,
-                        value: item.getElementsByTagName("obsrValue")[0].textContent,
-                    };
-                });
-
+            const xmlDoc = new DOMParser().parseFromString(weatherResponse.data, "text/xml");
+            const items = Array.from(xmlDoc.getElementsByTagName("item")).map(item => {
                 return {
-                    restAreaName: restArea.unitName,
-                    weather: items
+                    category: item.getElementsByTagName("category")[0].textContent,
+                    value: item.getElementsByTagName("obsrValue")[0].textContent,
                 };
-            })
-        );
+            });
+
+            weatherData.push({
+                restAreaName: restArea.unitName,
+                weather: items
+            });
+        }
 
         res.status(200).json(weatherData);
     } catch (error) {
