@@ -11,22 +11,21 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config # 환경 변수 불러오기
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-6==1(39%3zrmdt&t&h3!z)(hgs7!s_-nf4!c^!b*3nf7gt*2gm"
+SECRET_KEY = config("SECRET_KEY", default="django-insecure-6==1(39%3zrmdt&t&h3!z)(hgs7!s_-nf4!c^!b*3nf7gt*2gm")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -37,16 +36,20 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'rest_framework',  # Django REST Framework
+    'corsheaders',     # CORS 설정을 위해 필요
+    'weather',         # weather 앱 추가
 ]
 
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'corsheaders.middleware.CorsMiddleware',  # CORS 미들웨어 추가
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 ROOT_URLCONF = "myproject.urls"
@@ -69,7 +72,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "myproject.wsgi.application"
 
-
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
@@ -79,7 +81,6 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -99,7 +100,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
@@ -111,7 +111,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
@@ -122,17 +121,13 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-INSTALLED_APPS += [
-    'rest_framework',  # Django REST Framework
-    'corsheaders',     # CORS 설정을 위해 필요
-    'weather',         # weather 앱 추가
-]
+# API 키 설정
+KAKAO_REST_API_KEY = config("KAKAO_REST_API_KEY")
+KMA_API_KEY = config("KMA_API_KEY")
+HIGHWAY_API_KEY = config("HIGHWAY_API_KEY")
+AIRKOREA_API_KEY = config("AIRKOREA_API_KEY")
 
-MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # CORS 설정 추가
-    *MIDDLEWARE,  # 기존 미들웨어 유지
-]
-
-CORS_ORIGIN_WHITELIST = [
-    'http://localhost:3000',  # React가 실행되는 주소
+# CORS 설정
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5178',  # React가 실행되는 주소
 ]
