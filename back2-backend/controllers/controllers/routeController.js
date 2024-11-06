@@ -134,16 +134,28 @@ const getRouteInfo = async (req, res) => {
         const weatherData1 = await fetchWeatherData(point1.latitude, point1.longitude);
         const weatherData2 = await fetchWeatherData(point2.latitude, point2.longitude);
 
-        // 가장 가까운 휴게소만 추출
+        // 가장 가까운 휴게소만 추출 (unitName, xValue, yValue만)
         const closestRestArea1 = findClosestRestArea(restAreaResponse1.data.list, point1);
         const closestRestArea2 = findClosestRestArea(restAreaResponse2.data.list, point2);
+
+        const simplifiedRestArea1 = {
+            unitName: closestRestArea1.unitName,
+            xValue: closestRestArea1.xValue,
+            yValue: closestRestArea1.yValue
+        };
+
+        const simplifiedRestArea2 = {
+            unitName: closestRestArea2.unitName,
+            xValue: closestRestArea2.xValue,
+            yValue: closestRestArea2.yValue
+        };
 
         const routeInfo = {
             startPoint,
             endPoint,
             intermediatePoints: [
-                { ...point1, restArea: closestRestArea1, weather: weatherData1 },
-                { ...point2, restArea: closestRestArea2, weather: weatherData2 }
+                { ...point1, restArea: simplifiedRestArea1, weather: weatherData1 },
+                { ...point2, restArea: simplifiedRestArea2, weather: weatherData2 }
             ]
         };
 
