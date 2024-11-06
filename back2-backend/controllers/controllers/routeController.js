@@ -1,105 +1,157 @@
 const axios = require('axios');
+const xml2js = require('xml2js');
 
-// 기상청 API로 날씨 정보를 요청하는 함수
-async function fetchWeather(nx, ny) {
-    const baseDate = getBaseDate(); // 현재 날짜를 가져오는 함수
-    const baseTime = getBaseTime(); // 현재 시간을 가져오는 함수
+// 1/3, 2/3 지점 계산 함수
+const calculateIntermediatePoints = (start, end) => {
+    const latitudeDiff = end.latitude - start.latitude;
+    const longitudeDiff = end.longitude - start.longitude;
 
-    try {
-        const response = await axios.get(`http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst`, {
-            params: {
-                serviceKey: process.env.KMA_API_KEY, // 환경변수에서 API 키 가져오기
-                baseDate: baseDate,
-                baseTime: baseTime,
-                nx: nx,
-                ny: ny,
-                dataType: 'XML'
-            }
-        });
-
-        // 응답 데이터에서 필요한 정보 파싱
-        const weatherData = parseWeatherData(response.data);
-        return weatherData; // 파싱된 날씨 데이터 반환
-    } catch (error) {
-        console.error('기상청 API 요청 오류:', error);
-        return []; // 오류 발생 시 빈 배열 반환
-    }
-}
-
-// 날짜를 동적으로 설정하는 함수
-function getBaseDate() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // 월은 0부터 시작하므로 +1
-    const date = String(today.getDate()).padStart(2, '0');
-    return `${year}${month}${date}`; // YYYYMMDD 형식 반환
-}
-
-// 시간을 동적으로 설정하는 함수
-function getBaseTime() {
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-
-    // 현재 시간을 기준으로 API에서 요구하는 baseTime 결정
-    if (hours === '00' && minutes < '40') {
-        return '2300'; // 0시~1시 전까지는 전날 23시 데이터
-    }
-    return `${hours}00`; // 정시로 반환
-}
-
-// 응답 데이터에서 필요한 날씨 정보를 파싱하는 함수
-function parseWeatherData(data) {
-    const parser = new (require('xml2js')).Parser();
-    let weatherItems = [];
-
-    parser.parseString(data, (err, result) => {
-        if (err) {
-            console.error('XML 파싱 오류:', err);
-            return;
+    return [
+        {
+            latitude: start.latitude + latitudeDiff / 3,
+            longitude: start.longitude + longitudeDiff / 3
+        },
+        {
+            latitude: start.latitude + (2 * latitudeDiff) / 3,
+            longitude: start.longitude + (2 * longitudeDiff) / 3
         }
+    ];
+};
 
-        const items = result.response.body[0].items[0].item;
+// 두 지점 간의 거리 계산 함수 (위도/경도로 계산)
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // 지구 반지름 (km)
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) *
+            Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // km
+    return distance;
+};
 
-        // 필요한 날씨 정보 추출
-        items.forEach(item => {
-            const category = item.category[0];
-            const value = item.fcstValue[0];
+// 1/3, 2/3 지점에 가장 가까운 휴게소를 찾는 함수
+const findClosestRestArea = (restAreas, point) => {
+    let closestRestArea = null;
+    let minDistance = Infinity;
 
-            // 특정 카테고리에 따른 데이터 추출
-            if (category === 'T1H') { // 기온
-                weatherItems.push({ type: 'temperature', value: value });
-            } else if (category === 'RN1') { // 강수량
-                weatherItems.push({ type: 'precipitation', value: value });
-            }
-            // 필요 시 추가 카테고리 처리
-        });
+    restAreas.forEach(restArea => {
+        const distance = calculateDistance(
+            point.latitude,
+            point.longitude,
+            parseFloat(restArea.yValue),
+            parseFloat(restArea.xValue)
+        );
+
+        if (distance < minDistance) {
+            closestRestArea = restArea;
+            minDistance = distance;
+        }
     });
 
-    return weatherItems;
-}
-
-// 출발지와 도착지 사이의 날씨 정보를 가져오는 함수
-async function getRouteWeather(req, res) {
-    const { start, end } = req.query;
-
-    // 휴게소 좌표를 임의로 설정 (예시)
-    const restAreas = [
-        { name: '서울만남(부산)휴게소', nx: 60, ny: 127 },
-        { name: '죽전(서울)휴게소', nx: 60, ny: 128 }
-    ];
-
-    const results = await Promise.all(restAreas.map(async (area) => {
-        const weather = await fetchWeather(area.nx, area.ny);
-        return {
-            restAreaName: area.name,
-            weather: weather // 기온, 강수량 정보
-        };
-    }));
-
-    res.status(200).json(results);
-}
-
-module.exports = {
-    getRouteWeather
+    return closestRestArea;
 };
+
+// 날씨 데이터를 가져오는 함수
+const fetchWeatherData = async (latitude, longitude) => {
+    const url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
+    
+    const getCurrentDateAndTime = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');
+        const time = hour >= '01' ? String(hour - 1).padStart(2, '0') + '30' : '2330';
+        return { date: `${year}${month}${day}`, time };
+    };
+
+    const { date, time } = getCurrentDateAndTime();
+
+    const response = await axios.get(url, {
+        params: {
+            serviceKey: process.env.KMA_API_KEY,
+            numOfRows: 10,
+            pageNo: 1,
+            base_date: date,
+            base_time: time,
+            nx: Math.round(latitude),
+            ny: Math.round(longitude)
+        }
+    });
+
+    const parser = new xml2js.Parser({ explicitArray: false });
+    const parsedData = await parser.parseStringPromise(response.data);
+
+    if (!parsedData.response.body || !parsedData.response.body.items || !parsedData.response.body.items.item) {
+        throw new Error("기상청 API 응답에 items 데이터가 포함되지 않았습니다.");
+    }
+
+    const items = parsedData.response.body.items.item;
+    return items.map(item => ({
+        baseDate: item.baseDate,
+        baseTime: item.baseTime,
+        category: item.category,
+        forecastDate: item.fcstDate,
+        forecastTime: item.fcstTime,
+        forecastValue: item.fcstValue,
+        nx: item.nx,
+        ny: item.ny
+    }));
+};
+
+// 라우터 핸들러 함수
+const getRouteInfo = async (req, res) => {
+    const startPoint = req.body.startPoint;
+    const endPoint = req.body.endPoint;
+
+    const [point1, point2] = calculateIntermediatePoints(startPoint, endPoint);
+
+    try {
+        // 고속도로 휴게소 정보 조회
+        const restAreaResponse1 = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
+            params: {
+                key: process.env.HIGHWAY_API_KEY,
+                type: 'json',
+                xValue: point1.longitude,
+                yValue: point1.latitude
+            }
+        });
+
+        const restAreaResponse2 = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
+            params: {
+                key: process.env.HIGHWAY_API_KEY,
+                type: 'json',
+                xValue: point2.longitude,
+                yValue: point2.latitude
+            }
+        });
+
+        // 각 중간 지점의 날씨 데이터 조회
+        const weatherData1 = await fetchWeatherData(point1.latitude, point1.longitude);
+        const weatherData2 = await fetchWeatherData(point2.latitude, point2.longitude);
+
+        // 가장 가까운 휴게소만 추출
+        const closestRestArea1 = findClosestRestArea(restAreaResponse1.data.list, point1);
+        const closestRestArea2 = findClosestRestArea(restAreaResponse2.data.list, point2);
+
+        const routeInfo = {
+            startPoint,
+            endPoint,
+            intermediatePoints: [
+                { ...point1, restArea: closestRestArea1, weather: weatherData1 },
+                { ...point2, restArea: closestRestArea2, weather: weatherData2 }
+            ]
+        };
+
+        res.status(200).json(routeInfo);
+    } catch (error) {
+        console.error('Error fetching route info:', error.message);
+        res.status(500).json({ message: '경로 정보를 불러오는 데 실패했습니다.', error: error.message });
+    }
+};
+
+module.exports = { getRouteInfo };

@@ -1,14 +1,13 @@
+// app.js
 const express = require('express');
-const weatherRoutes = require('./routes/weatherRoutes');
-const routeRoutes = require('./routes/routeRoutes');
+const routeRoutes = require('./controllers/routes/routeRoutes');  // 라우터 불러오기
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5173;
 
-app.use(express.json());
-app.use('/api', weatherRoutes);
-app.use('/api', routeRoutes);
+app.use(express.json());  // JSON 바디 파싱
+app.use('/api', routeRoutes);  // '/api' 경로에서 routeRoutes로 연결
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
