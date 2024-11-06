@@ -55,10 +55,9 @@ const findClosestRestArea = (restAreas, point) => {
     return closestRestArea;
 };
 
-// 날씨 데이터를 가져오는 함수
 const fetchWeatherData = async (latitude, longitude) => {
     const url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
-    
+
     const getCurrentDateAndTime = () => {
         const now = new Date();
         const year = now.getFullYear();
@@ -71,37 +70,48 @@ const fetchWeatherData = async (latitude, longitude) => {
 
     const { date, time } = getCurrentDateAndTime();
 
-    const response = await axios.get(url, {
-        params: {
-            serviceKey: process.env.KMA_API_KEY,
-            numOfRows: 10,
-            pageNo: 1,
-            base_date: date,
-            base_time: time,
-            nx: Math.round(latitude),
-            ny: Math.round(longitude)
+    try {
+        const response = await axios.get(url, {
+            params: {
+                serviceKey: process.env.KMA_API_KEY,
+                numOfRows: 10,
+                pageNo: 1,
+                base_date: date,
+                base_time: time,
+                nx: Math.round(latitude),
+                ny: Math.round(longitude)
+            }
+        });
+
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const parsedData = await parser.parseStringPromise(response.data);
+
+        if (!parsedData.response.body || !parsedData.response.body.items || !parsedData.response.body.items.item) {
+            throw new Error("기상청 API 응답에 items 데이터가 포함되지 않았습니다.");
         }
-    });
 
-    const parser = new xml2js.Parser({ explicitArray: false });
-    const parsedData = await parser.parseStringPromise(response.data);
+        const items = parsedData.response.body.items.item;
 
-    if (!parsedData.response.body || !parsedData.response.body.items || !parsedData.response.body.items.item) {
-        throw new Error("기상청 API 응답에 items 데이터가 포함되지 않았습니다.");
+        // 5개 시간대 데이터만 필터링
+        const filteredItems = items.slice(0, 5); // 첫 5개만 추출
+
+        // 날씨 정보를 정상적으로 반환
+        return filteredItems.map(item => ({
+            baseDate: item.baseDate,
+            baseTime: item.baseTime,
+            category: item.category,
+            forecastDate: item.fcstDate,
+            forecastTime: item.fcstTime,
+            forecastValue: item.fcstValue,
+            nx: item.nx,
+            ny: item.ny
+        }));
+    } catch (error) {
+        console.error("날씨 정보 오류:", error.message);
+        throw new Error("날씨 데이터를 가져오는 데 실패했습니다.");
     }
-
-    const items = parsedData.response.body.items.item;
-    return items.map(item => ({
-        baseDate: item.baseDate,
-        baseTime: item.baseTime,
-        category: item.category,
-        forecastDate: item.fcstDate,
-        forecastTime: item.fcstTime,
-        forecastValue: item.fcstValue,
-        nx: item.nx,
-        ny: item.ny
-    }));
 };
+
 
 // 라우터 핸들러 함수
 const getRouteInfo = async (req, res) => {
