@@ -55,6 +55,7 @@ const findClosestRestArea = (restAreas, point) => {
     return closestRestArea;
 };
 
+// 시간대별로 여러 개의 데이터를 저장할 수 있도록 수정된 fetchWeatherData 함수
 const fetchWeatherData = async (latitude, longitude) => {
     const url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
 
@@ -74,7 +75,7 @@ const fetchWeatherData = async (latitude, longitude) => {
         const response = await axios.get(url, {
             params: {
                 serviceKey: process.env.KMA_API_KEY,
-                numOfRows: 10,
+                numOfRows: 100,  // 충분한 데이터 수 설정
                 pageNo: 1,
                 base_date: date,
                 base_time: time,
@@ -92,20 +93,36 @@ const fetchWeatherData = async (latitude, longitude) => {
 
         const items = parsedData.response.body.items.item;
 
-        // 5개 시간대 데이터만 필터링
-        const filteredItems = items.slice(0, 5); // 첫 5개만 추출
+        // 시간대별로 온도, 하늘 상태, 강수 확률 그룹화
+        const weather = {
+            temperature: [],
+            sky: [],
+            precipitation: []
+        };
 
-        // 날씨 정보를 정상적으로 반환
-        return filteredItems.map(item => ({
-            baseDate: item.baseDate,
-            baseTime: item.baseTime,
-            category: item.category,
-            forecastDate: item.fcstDate,
-            forecastTime: item.fcstTime,
-            forecastValue: item.fcstValue,
-            nx: item.nx,
-            ny: item.ny
-        }));
+        items.forEach(item => {
+            const time = `${item.fcstTime}`;
+            if (item.category === 'T1H') {  // 기온
+                weather.temperature.push({ time, value: item.fcstValue });
+            } else if (item.category === 'SKY') {  // 하늘 상태
+                weather.sky.push({
+                    time,
+                    value: item.fcstValue,
+                    baseDate: item.baseDate,
+                    baseTime: item.baseTime,
+                    category: item.category,
+                    fcstDate: item.fcstDate,
+                    fcstTime: item.fcstTime,
+                    nx: item.nx,
+                    ny: item.ny
+                });
+            } else if (item.category === 'PTY') {  // 강수
+                weather.precipitation.push({ time, value: item.fcstValue });
+            }
+        });
+
+        // 반환할 결과
+        return weather;
     } catch (error) {
         console.error("날씨 정보 오류:", error.message);
         throw new Error("날씨 데이터를 가져오는 데 실패했습니다.");
@@ -140,7 +157,7 @@ const getRouteInfo = async (req, res) => {
             }
         });
 
-        // 각 중간 지점의 날씨 데이터 조회
+        // 각 중간 지점의 날씨 데이터 조회 (시간대별 5개 데이터)
         const weatherData1 = await fetchWeatherData(point1.latitude, point1.longitude);
         const weatherData2 = await fetchWeatherData(point2.latitude, point2.longitude);
 
