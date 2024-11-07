@@ -29,7 +29,8 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
             Math.cos(lat2 * (Math.PI / 180)) *
             Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // km
+    const distance = R * c; // km
+    return distance;
 };
 
 // 1/3, 2/3 지점에 가장 가까운 휴게소를 찾는 함수
@@ -54,7 +55,7 @@ const findClosestRestArea = (restAreas, point) => {
     return closestRestArea;
 };
 
-// 시간대별로 여러 개의 데이터를 저장할 수 있도록 수정된 fetchWeatherData 함수
+// 날씨 데이터 요청 함수
 const fetchWeatherData = async (latitude, longitude) => {
     const url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
 
@@ -74,7 +75,7 @@ const fetchWeatherData = async (latitude, longitude) => {
         const response = await axios.get(url, {
             params: {
                 serviceKey: process.env.KMA_API_KEY,
-                numOfRows: 100,  // 충분한 데이터 수 설정
+                numOfRows: 100,
                 pageNo: 1,
                 base_date: date,
                 base_time: time,
@@ -86,14 +87,12 @@ const fetchWeatherData = async (latitude, longitude) => {
         const parser = new xml2js.Parser({ explicitArray: false });
         const parsedData = await parser.parseStringPromise(response.data);
 
-        // 예외 처리 강화: API 응답에서 필요한 항목이 있는지 확인
         if (!parsedData.response || !parsedData.response.body || !parsedData.response.body.items || !parsedData.response.body.items.item) {
             throw new Error("기상청 API 응답에 items 데이터가 포함되지 않았습니다.");
         }
 
         const items = parsedData.response.body.items.item;
 
-        // 시간대별로 온도, 하늘 상태, 강수 확률 그룹화
         const weather = {
             temperature: [],
             sky: [],
@@ -101,7 +100,7 @@ const fetchWeatherData = async (latitude, longitude) => {
         };
 
         items.forEach(item => {
-            const time = `${item.fcstTime}`;
+            const time = item.fcstTime;
             if (item.category === 'T1H') {  // 기온
                 weather.temperature.push({ time, value: item.fcstValue });
             } else if (item.category === 'SKY') {  // 하늘 상태
@@ -121,63 +120,83 @@ const fetchWeatherData = async (latitude, longitude) => {
     }
 };
 
+// getRestAreas 함수에서 각 페이지 응답 상태 확인
+const getRestAreas = async (point, retries = 3) => {
+    let restAreaResponse = null;
+    for (let page = 1; page <= retries; page++) {
+        try {
+            restAreaResponse = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
+                params: {
+                    key: process.env.HIGHWAY_API_KEY,  // 실제 API 키를 사용하세요
+                    type: 'json',
+                    numOfRows: 99,
+                    pageNo: page
+                }
+            });
+            
+            // API 응답 내용 로깅 추가
+            console.log(`페이지 ${page} 응답:`, restAreaResponse.data);
+            
+            if (restAreaResponse.data.list && restAreaResponse.data.list.length > 0) {
+                return restAreaResponse.data.list;
+            } else {
+                console.log(`페이지 ${page}에서 휴게소 데이터 없음`);
+            }
+        } catch (error) {
+            console.error(`페이지 ${page} 요청 실패:`, error.message);
+        }
+    }
+    return [];
+};
 
-// 라우터 핸들러 함수
+// 경로 정보 요청 함수
 const getRouteInfo = async (req, res) => {
-    const { startPoint, endPoint } = req.body;
+    const startPoint = req.body.startPoint;
+    const endPoint = req.body.endPoint;
 
     const [point1, point2] = calculateIntermediatePoints(startPoint, endPoint);
 
     try {
-        // 고속도로 휴게소 정보 조회
-        const [restAreaResponse1, restAreaResponse2] = await Promise.all([
-            axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
-                params: {
-                    key: process.env.HIGHWAY_API_KEY,
-                    type: 'json',
-                    xValue: point1.longitude,
-                    yValue: point1.latitude
-                }
-            }),
-            axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
-                params: {
-                    key: process.env.HIGHWAY_API_KEY,
-                    type: 'json',
-                    xValue: point2.longitude,
-                    yValue: point2.latitude
-                }
-            })
-        ]);
+        const restAreaList1 = await getRestAreas(point1);
+        const restAreaList2 = await getRestAreas(point2);
 
-        // 각 중간 지점의 날씨 데이터 조회 (시간대별 5개 데이터)
-        const [weatherData1, weatherData2] = await Promise.all([
-            fetchWeatherData(point1.latitude, point1.longitude),
-            fetchWeatherData(point2.latitude, point2.longitude)
-        ]);
+        if (restAreaList1.length === 0 || restAreaList2.length === 0) {
+            throw new Error("휴게소 데이터를 찾을 수 없습니다.");
+        }
 
-        // 가장 가까운 휴게소만 추출 (unitName, xValue, yValue만)
-        const closestRestArea1 = findClosestRestArea(restAreaResponse1.data.list, point1);
-        const closestRestArea2 = findClosestRestArea(restAreaResponse2.data.list, point2);
+        const closestRestArea1 = findClosestRestArea(restAreaList1, point1);
+        const closestRestArea2 = findClosestRestArea(restAreaList2, point2);
 
-        const simplifiedRestArea1 = {
-            unitName: closestRestArea1.unitName,
-            xValue: closestRestArea1.xValue,
-            yValue: closestRestArea1.yValue
-        };
+        if (!closestRestArea1 || !closestRestArea2) {
+            throw new Error("가장 가까운 휴게소를 찾을 수 없습니다.");
+        }
 
-        const simplifiedRestArea2 = {
-            unitName: closestRestArea2.unitName,
-            xValue: closestRestArea2.xValue,
-            yValue: closestRestArea2.yValue
-        };
+        // 각 휴게소의 위치와 날씨 데이터를 리스트에 포함
+        const intermediatePoints = [
+            {
+                ...point1,
+                restArea: {
+                    unitName: closestRestArea1.unitName,
+                    xValue: closestRestArea1.xValue,
+                    yValue: closestRestArea1.yValue
+                },
+                weather: await fetchWeatherData(parseFloat(closestRestArea1.yValue), parseFloat(closestRestArea1.xValue))
+            },
+            {
+                ...point2,
+                restArea: {
+                    unitName: closestRestArea2.unitName,
+                    xValue: closestRestArea2.xValue,
+                    yValue: closestRestArea2.yValue
+                },
+                weather: await fetchWeatherData(parseFloat(closestRestArea2.yValue), parseFloat(closestRestArea2.xValue))
+            }
+        ];
 
         const routeInfo = {
             startPoint,
             endPoint,
-            intermediatePoints: [
-                { ...point1, restArea: simplifiedRestArea1, weather: weatherData1 },
-                { ...point2, restArea: simplifiedRestArea2, weather: weatherData2 }
-            ]
+            intermediatePoints
         };
 
         res.status(200).json(routeInfo);
