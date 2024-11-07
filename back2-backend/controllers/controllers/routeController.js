@@ -29,8 +29,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
             Math.cos(lat2 * (Math.PI / 180)) *
             Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // km
-    return distance;
+    return R * c; // km
 };
 
 // 1/3, 2/3 지점에 가장 가까운 휴게소를 찾는 함수
@@ -87,7 +86,8 @@ const fetchWeatherData = async (latitude, longitude) => {
         const parser = new xml2js.Parser({ explicitArray: false });
         const parsedData = await parser.parseStringPromise(response.data);
 
-        if (!parsedData.response.body || !parsedData.response.body.items || !parsedData.response.body.items.item) {
+        // 예외 처리 강화: API 응답에서 필요한 항목이 있는지 확인
+        if (!parsedData.response || !parsedData.response.body || !parsedData.response.body.items || !parsedData.response.body.items.item) {
             throw new Error("기상청 API 응답에 items 데이터가 포함되지 않았습니다.");
         }
 
@@ -107,21 +107,13 @@ const fetchWeatherData = async (latitude, longitude) => {
             } else if (item.category === 'SKY') {  // 하늘 상태
                 weather.sky.push({
                     time,
-                    value: item.fcstValue,
-                    baseDate: item.baseDate,
-                    baseTime: item.baseTime,
-                    category: item.category,
-                    fcstDate: item.fcstDate,
-                    fcstTime: item.fcstTime,
-                    nx: item.nx,
-                    ny: item.ny
+                    value: item.fcstValue
                 });
             } else if (item.category === 'PTY') {  // 강수
                 weather.precipitation.push({ time, value: item.fcstValue });
             }
         });
 
-        // 반환할 결과
         return weather;
     } catch (error) {
         console.error("날씨 정보 오류:", error.message);
@@ -132,34 +124,36 @@ const fetchWeatherData = async (latitude, longitude) => {
 
 // 라우터 핸들러 함수
 const getRouteInfo = async (req, res) => {
-    const startPoint = req.body.startPoint;
-    const endPoint = req.body.endPoint;
+    const { startPoint, endPoint } = req.body;
 
     const [point1, point2] = calculateIntermediatePoints(startPoint, endPoint);
 
     try {
         // 고속도로 휴게소 정보 조회
-        const restAreaResponse1 = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
-            params: {
-                key: process.env.HIGHWAY_API_KEY,
-                type: 'json',
-                xValue: point1.longitude,
-                yValue: point1.latitude
-            }
-        });
-
-        const restAreaResponse2 = await axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
-            params: {
-                key: process.env.HIGHWAY_API_KEY,
-                type: 'json',
-                xValue: point2.longitude,
-                yValue: point2.latitude
-            }
-        });
+        const [restAreaResponse1, restAreaResponse2] = await Promise.all([
+            axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
+                params: {
+                    key: process.env.HIGHWAY_API_KEY,
+                    type: 'json',
+                    xValue: point1.longitude,
+                    yValue: point1.latitude
+                }
+            }),
+            axios.get('https://data.ex.co.kr/openapi/locationinfo/locationinfoRest', {
+                params: {
+                    key: process.env.HIGHWAY_API_KEY,
+                    type: 'json',
+                    xValue: point2.longitude,
+                    yValue: point2.latitude
+                }
+            })
+        ]);
 
         // 각 중간 지점의 날씨 데이터 조회 (시간대별 5개 데이터)
-        const weatherData1 = await fetchWeatherData(point1.latitude, point1.longitude);
-        const weatherData2 = await fetchWeatherData(point2.latitude, point2.longitude);
+        const [weatherData1, weatherData2] = await Promise.all([
+            fetchWeatherData(point1.latitude, point1.longitude),
+            fetchWeatherData(point2.latitude, point2.longitude)
+        ]);
 
         // 가장 가까운 휴게소만 추출 (unitName, xValue, yValue만)
         const closestRestArea1 = findClosestRestArea(restAreaResponse1.data.list, point1);
