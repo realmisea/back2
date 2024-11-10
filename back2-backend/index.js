@@ -6,6 +6,10 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5173;
+const app = require('./app');
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
 
 // 라우터 모듈 가져오기
 const routeRoutes = require('./controllers/routes/routeRoutes');
