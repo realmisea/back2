@@ -3,7 +3,7 @@ FROM node:16 AS express-build
 WORKDIR /app
 COPY ./package.json /app/
 RUN npm install
-COPY ./frontend /app/
+COPY . /app/
 
 # 2단계: 최종 이미지
 FROM node:16
