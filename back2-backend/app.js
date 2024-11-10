@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 5174;
 
 // PORT 값을 로그로 출력
-console.log(`Using port: ${process.env.PORT || 5173}`);
+console.log(`Using port: ${process.env.PORT || 5174}`);
 
 // 루트 경로에 대한 JSON 응답 처리
 app.get('/', (req, res) => {
