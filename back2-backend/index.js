@@ -4,7 +4,6 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 require('dotenv').config();
 const app = require('./app');
-const app = express();
 const PORT = process.env.PORT || 5173;
 
 // 라우터 모듈 가져오기
