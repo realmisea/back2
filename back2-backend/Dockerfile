@@ -1,18 +1,17 @@
-# Node.js 이미지 선택
-FROM node:18
+# Node.js 기반 이미지
+FROM node:16
 
-# 작업 디렉토리 설정
+# 애플리케이션 디렉토리로 작업 디렉토리 설정
 WORKDIR /app
 
-# package.json과 package-lock.json 복사 후 의존성 설치
-COPY package*.json ./
+# package.json과 package-lock.json 파일 복사
+COPY package.json package-lock.json /app/
+
+# 의존성 설치
 RUN npm install
 
-# 모든 파일 복사
-COPY . .
+# 애플리케이션 파일 복사
+COPY . /app/
 
-# 서버가 사용하는 포트를 지정
-EXPOSE 5173
-
-# 앱 실행
-CMD ["node", "index.js"]
+# 애플리케이션 실행
+CMD ["npm", "start"]
