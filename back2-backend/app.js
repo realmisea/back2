@@ -3,7 +3,7 @@ const express = require('express');
 const routeRoutes = require('./controllers/routes/routeRoutes');  // 라우터 불러오기
 
 const app = express();
-const PORT = process.env.PORT || 5173;
+const PORT = process.env.PORT || 5174;
 
 // PORT 값을 로그로 출력
 console.log(`Using port: ${process.env.PORT || 5173}`);
