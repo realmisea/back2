@@ -11,3 +11,7 @@ app.use('/api', routeRoutes);  // '/api' 경로에서 routeRoutes로 연결
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
