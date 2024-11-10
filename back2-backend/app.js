@@ -17,6 +17,10 @@ app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'Test route works!' });
+});
+
 // 배포 체크용 엔드포인트
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
