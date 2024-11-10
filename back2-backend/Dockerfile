@@ -1,17 +1,21 @@
-# Node.js 기반 이미지
-FROM node:16
-
-# 애플리케이션 디렉토리로 작업 디렉토리 설정
+# 1단계: Django 빌드
+FROM python:3.9-slim AS django-build
 WORKDIR /app
+COPY ./backend/requirements.txt /app/
+RUN pip install -r requirements.txt
+COPY ./backend /app/
 
-# package.json과 package-lock.json 파일 복사
-COPY package.json package-lock.json /app/
-
-# 의존성 설치
+# 2단계: Express 빌드
+FROM node:16 AS express-build
+WORKDIR /app
+COPY ./frontend/package.json /app/
 RUN npm install
+COPY ./frontend /app/
 
-# 애플리케이션 파일 복사
-COPY . /app/
-
-# 애플리케이션 실행
-CMD ["npm", "start"]
+# 3단계: 최종 이미지
+FROM python:3.9-slim
+WORKDIR /app
+COPY --from=django-build /app /app/
+COPY --from=express-build /app /app/
+EXPOSE 8000 3000
+CMD ["sh", "-c", "python manage.py runserver 0.0.0.0:8000 & npm start"]
