@@ -1,8 +1,13 @@
-// app.js
 const express = require('express');
-const routeRoutes = require('./controllers/routes/routeRoutes');  // 라우터 불러오기
+const cors = require('cors');  // cors 모듈 가져오기
+const routeRoutes = require('./controllers/routes/routeRoutes');
 
 const app = express();
+
+app.use(cors()); // 모든 도메인에서의 요청 허용
+
+// 또는 특정 도메인만 허용하려면:
+// app.use(cors({ origin: 'http://your-frontend-domain.com' }));
 
 // 루트 경로에 대한 JSON 응답 처리
 app.get('/', (req, res) => {
@@ -21,4 +26,4 @@ app.get('/health', (req, res) => {
     res.status(200).send('OK');
 });
 
-module.exports = app; // app 객체를 export
+module.exports = app;
