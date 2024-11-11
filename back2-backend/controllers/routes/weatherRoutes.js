@@ -1,5 +1,5 @@
 const express = require('express');
-const { getSimpleWeather, getDetailedWeather } = require('../controllers/weatherController');
+const { getSimpleWeather, getDetailedWeather } = require('../weatherController');
 const router = express.Router();
 
 // 간단한 날씨 정보 (초기 화면)
