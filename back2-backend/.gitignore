@@ -1,3 +1,4 @@
+*.pem
 manage.py
 *.pyc
 __pycache__
