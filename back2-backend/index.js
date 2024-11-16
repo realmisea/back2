@@ -13,8 +13,8 @@ console.log(PORT);
 // };
 
 const httpsOptions = {
-    key: fs.readFileSync('cert/localhost-key.pem'), // mkcert 생성 인증서
-    cert: fs.readFileSync('cert/localhost-key.pem'),
+    key: fs.readFileSync('./cert/localhost-key.pem'), // mkcert 생성 인증서
+    cert: fs.readFileSync('./cert/localhost-key.pem'),
   };
 
 // HTTPS 서버 실행
