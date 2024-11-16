@@ -10,8 +10,8 @@ app.use(
     origin: [
       'https://localhost:5173',
       'http://localhost:5173',
-      'https://localhost:3000',
-      'https://fierce-jerrilee-realmisea-3853df29.koyeb.app',
+//       'https://localhost:3000',
+//       'https://fierce-jerrilee-realmisea-3853df29.koyeb.app',
     ],
     methods: ['GET', 'POST', 'OPTIONS'], // 허용 HTTP 메서드
     credentials: true, // 인증 정보 포함 허용
@@ -23,7 +23,7 @@ app.use(express.json());
 
 // 기본 라우트
 app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to the backend API!' });
+  res.send('Welcome to the backend API!' );
 });
 
 // API 라우트
