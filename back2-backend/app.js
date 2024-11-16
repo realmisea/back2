@@ -4,22 +4,32 @@ const routeRoutes = require('./controllers/routes/routeRoutes'); // 라우트 �
 
 const app = express();
 
+// JSON 요청 바디 파싱
+// app.use((req, res, next) => {
+//     console.log('headers:', req.headers['x-forwarded-proto']);
+//     console.log('url:', req.url);
+//       if (req.headers['x-forwarded-proto'] !== 'https') {
+//         return res.redirect(`${process.env.KOYEB_DOMAIN}`);
+//       }
+//       next();
+//     });
+
+app.use(express.json());
+
+
 // CORS 설정
 app.use(
-  cors({
-    origin: [
-      'https://localhost:5173',
-      'http://localhost:5173',
-//       'https://localhost:3000',
-//       'https://fierce-jerrilee-realmisea-3853df29.koyeb.app',
-    ],
-    methods: ['GET', 'POST', 'OPTIONS'], // 허용 HTTP 메서드
-    credentials: true, // 인증 정보 포함 허용
-  })
-);
-
-// JSON 요청 바디 파싱
-app.use(express.json());
+      cors({
+        origin: [
+          'https://localhost:5173',
+          'http://localhost:5173',
+    //       'https://localhost:3000',
+    //       'https://fierce-jerrilee-realmisea-3853df29.koyeb.app',
+        ],
+        methods: ['GET', 'POST', 'OPTIONS'], // 허용 HTTP 메서드
+        credentials: true, // 인증 정보 포함 허용
+      })
+    );
 
 // 기본 라우트
 app.get('/', (req, res) => {

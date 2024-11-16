@@ -12,12 +12,15 @@ console.log(PORT);
 //   cert: fs.readFileSync('./cert/18.219.118.230.pem'),
 // };
 
-const httpsOptions = {
-    key: fs.readFileSync('./cert/localhost-key.pem'), // mkcert 생성 인증서
-    cert: fs.readFileSync('./cert/localhost.pem'),
-  };
+// const httpsOptions = {
+//     key: fs.readFileSync('./cert/localhost-key.pem'), // mkcert 생성 인증서
+//     cert: fs.readFileSync('./cert/localhost.pem'),
+//   };
 
 // HTTPS 서버 실행
-https.createServer(httpsOptions, app).listen(PORT, () => {
-  console.log(`HTTPS server running at https://localhost:${PORT}`);
-});
+// https.createServer(httpsOptions, app).listen(PORT, () => {
+//   console.log(`HTTPS server running at https://localhost:${PORT}`);
+// });
+app.listen(PORT, () => {
+    console.log(`http://localhost:${PORT}`);
+})
