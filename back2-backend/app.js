@@ -10,7 +10,8 @@ const app = express();
 app.use(
     cors({
         origin: [
-            'https://localhost:5173', // 웹 로컬 링크 (포트 번호는 사용하는 환경에 맞게)
+            'https://localhost:5173',
+            'http://localhost:5173', // 웹 로컬 링크 (포트 번호는 사용하는 환경에 맞게)
             'https://localhost:3000', // 서버 로컬 링크 (포트 번호는 사용하는 환경에 맞게)
             'https://fierce-jerrilee-realmisea-3853df29.koyeb.app', // 배포 서버 링크
         ],
