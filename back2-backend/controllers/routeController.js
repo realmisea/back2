@@ -164,7 +164,7 @@ const getRouteInfoWithKakao = async (req, res) => {
         const routeInfo = {
             startPoint,
             endPoint,
-            drivingRoute, // 카카오 길찾기 API에서 반환된 도로 경로
+           // drivingRoute, // 카카오 길찾기 API에서 반환된 도로 경로
             intermediatePoints: [
                 {
                     ...point1,

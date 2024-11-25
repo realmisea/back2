@@ -75,7 +75,7 @@ async function getSimpleWeather(location) {
 }
 
 // 경로 정보 처리하는 함수 (출발지, 목적지)
-exports.getRouteInfo = async (req, res) => {
+exports.getRouteInfoWithKakao = async (req, res) => {
     const { start, end } = req.body;
     const startCoords = { lat: start.lat, lon: start.lon };
     const endCoords = { lat: end.lat, lon: end.lon };
