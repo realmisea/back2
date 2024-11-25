@@ -19,34 +19,22 @@ const fetchDrivingRoute = async (start, end) => {
     try {
         const response = await axios.get('https://apis-navi.kakaomobility.com/v1/directions', {
             params: {
-                origin: `${start.longitude},${start.latitude}`, // 출발지 좌표
-                destination: `${end.longitude},${end.latitude}`, // 도착지 좌표
-                waypoints: '', // 경유지 좌표(없으면 빈 문자열)
-                priority: 'RECOMMEND' // 추천 경로 (자동차 경로를 고려)
+                origin: `${start.longitude},${start.latitude}`,
+                destination: `${end.longitude},${end.latitude}`,
+                waypoints: '',
+                priority: 'RECOMMEND'
             },
             headers: {
-                Authorization: `KakaoAK ${process.env.KAKAO_REST_API_KEY}` // 카카오 API 키
+                Authorization: `KakaoAK ${process.env.KAKAO_REST_API_KEY}`
             }
         });
 
-        // 카카오 길찾기 API 응답 확인
-        console.log('카카오 길찾기 API 응답:', response.data);
-
-        // 경로가 존재하는지 확인
         const routes = response.data.routes;
         if (!routes || routes.length === 0) {
-            throw new Error("경로 정보를 찾을 수 없습니다.");
+            throw new Error('경로 정보를 찾을 수 없습니다.');
         }
 
-        const route = routes[0];
-        const sections = route.sections;
-
-        // sections가 존재하지 않으면 오류 처리
-        if (!sections || sections.length === 0) {
-            throw new Error("경로의 섹션 정보를 찾을 수 없습니다.");
-        }
-
-        return route; // sections를 사용해 경로를 나누어 추가적인 처리 가능
+        return routes[0];
     } catch (error) {
         console.error('카카오 길찾기 API 요청 오류:', error.message);
         throw new Error('카카오 길찾기 API 호출에 실패했습니다.');
@@ -80,7 +68,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
         Math.cos(lat1 * (Math.PI / 180)) *
             Math.cos(lat2 * (Math.PI / 180)) *
             Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); // 거리(km)
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
 // 휴게소 데이터 가져오기
@@ -134,6 +122,34 @@ const findClosestRestArea = (restAreas, point, exclude = null) => {
     return closestRestArea;
 };
 
+// 날씨 정보 가져오기
+const fetchWeatherData = async (latitude, longitude) => {
+    try {
+        const response = await axios.get('http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst', {
+            params: {
+                serviceKey: process.env.KMA_API_KEY, // 서비스 키
+                pageNo: 1, // 페이지 번호
+                numOfRows: 10, // 한 번에 가져올 데이터 개수
+                dataType: 'JSON', 
+                base_date: new Date().toISOString().slice(0, 10).replace(/-/g, ''), 
+                base_time: '0600', // 기준 시간 (초단기예보는 0200, 0500, 0800 등)
+                nx: Math.round(longitude), 
+                ny: Math.round(latitude)  
+            }
+        });
+
+        if (response.data.response.body.items.item) {
+            return response.data.response.body.items.item; // 날씨 데이터 반환
+        } else {
+            console.error('날씨 데이터가 비어 있습니다:', response.data);
+            return null;
+        }
+    } catch (error) {
+        console.error('날씨 데이터 요청 실패:', error.message);
+        return null;
+    }
+};
+
 // 경로 정보 요청 처리 함수
 const getRouteInfoWithKakao = async (req, res) => {
     const { startPoint, endPoint } = req.body;
@@ -146,10 +162,6 @@ const getRouteInfoWithKakao = async (req, res) => {
         // 카카오 길찾기 API 경로 가져오기
         const drivingRoute = await fetchDrivingRoute(startPoint, endPoint);
 
-        // sections 정보 확인
-        const sections = drivingRoute.sections;
-        console.log('경로 sections:', sections); // 디버깅용 로그 추가
-
         // 1/3, 2/3 지점 계산
         const [point1, point2] = calculateIntermediatePoints(startPoint, endPoint);
 
@@ -160,11 +172,15 @@ const getRouteInfoWithKakao = async (req, res) => {
         const closestRestArea1 = findClosestRestArea(restAreas, point1);
         const closestRestArea2 = findClosestRestArea(restAreas, point2, closestRestArea1);
 
+        // 각 지점에 대한 날씨 정보 가져오기
+        const weather1 = await fetchWeatherData(point1.latitude, point1.longitude);
+        const weather2 = await fetchWeatherData(point2.latitude, point2.longitude);
+        const destinationWeather = await fetchWeatherData(endPoint.latitude, endPoint.longitude);
+
         // 응답 데이터 구성
         const routeInfo = {
             startPoint,
             endPoint,
-           // drivingRoute, // 카카오 길찾기 API에서 반환된 도로 경로
             intermediatePoints: [
                 {
                     ...point1,
@@ -175,7 +191,8 @@ const getRouteInfoWithKakao = async (req, res) => {
                             longitude: closestRestArea1.xValue
                         },
                         mapUrl: generateMapUrl(closestRestArea1.yValue, closestRestArea1.xValue, closestRestArea1.unitName)
-                    }
+                    },
+                    weather: weather1
                 },
                 {
                     ...point2,
@@ -186,9 +203,17 @@ const getRouteInfoWithKakao = async (req, res) => {
                             longitude: closestRestArea2.xValue
                         },
                         mapUrl: generateMapUrl(closestRestArea2.yValue, closestRestArea2.xValue, closestRestArea2.unitName)
-                    }
+                    },
+                    weather: weather2
                 }
-            ]
+            ],
+            destinationWeather: {
+                coordinates: {
+                    latitude: endPoint.latitude,
+                    longitude: endPoint.longitude
+                },
+                weather: destinationWeather
+            }
         };
 
         res.status(200).json(routeInfo);
