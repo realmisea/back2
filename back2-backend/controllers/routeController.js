@@ -189,7 +189,6 @@ const getBaseTime = () => {
     return String(hour).padStart(2, '0') + '30';
 };
 
-
 // 경로 정보 요청 처리 함수
 const getRouteInfoWithKakao = async (req, res) => {
     const { startPoint, endPoint } = req.body;
@@ -233,7 +232,7 @@ const getRouteInfoWithKakao = async (req, res) => {
                         mapUrl: generateMapUrl(closestRestArea1.yValue, closestRestArea1.xValue, closestRestArea1.unitName)
                     },
                     weather: weather1,
-                    intermediatePointMapUrl: generateIntermediatePointMapUrl(point1.latitude, point1.longitude)  // 1/3 지점 표시
+                    intermediatePointMapUrl: generateIntermediatePointMapUrl(closestRestArea1.yValue, closestRestArea1.xValue)  // 1/3 지점
                 },
                 {
                     ...point2,
@@ -246,7 +245,7 @@ const getRouteInfoWithKakao = async (req, res) => {
                         mapUrl: generateMapUrl(closestRestArea2.yValue, closestRestArea2.xValue, closestRestArea2.unitName)
                     },
                     weather: weather2,
-                    intermediatePointMapUrl: generateIntermediatePointMapUrl(point2.latitude, point2.longitude)  // 2/3 지점 표시
+                    intermediatePointMapUrl: generateIntermediatePointMapUrl(closestRestArea2.yValue, closestRestArea2.xValue)  // 2/3 지점
                 }
             ],
             destinationWeather,
@@ -259,6 +258,7 @@ const getRouteInfoWithKakao = async (req, res) => {
         return res.status(500).json({ message: error.message });
     }
 };
+
 
 module.exports = {
     getRouteInfoWithKakao
