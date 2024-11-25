@@ -14,6 +14,10 @@ const generateDirectionsUrl = (latitude, longitude, name = '') => {
         : `https://map.kakao.com/link/to/${latitude},${longitude}`;
 };
 
+const generateIntermediatePointMapUrl = (latitude, longitude) => {
+    return `https://map.kakao.com/link/map/IntermediatePoint,${latitude},${longitude}`;
+};
+
 // 카카오 길찾기 API 요청 함수
 const fetchDrivingRoute = async (start, end) => {
     try {
@@ -125,30 +129,66 @@ const findClosestRestArea = (restAreas, point, exclude = null) => {
 // 날씨 정보 가져오기
 const fetchWeatherData = async (latitude, longitude) => {
     try {
-        const response = await axios.get('http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst', {
+        const response = await axios.get('https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst', {
             params: {
-                serviceKey: process.env.KMA_API_KEY, // 서비스 키
-                pageNo: 1, // 페이지 번호
-                numOfRows: 10, // 한 번에 가져올 데이터 개수
-                dataType: 'JSON', 
-                base_date: new Date().toISOString().slice(0, 10).replace(/-/g, ''), 
-                base_time: '0600', // 기준 시간 (초단기예보는 0200, 0500, 0800 등)
-                nx: Math.round(longitude), 
-                ny: Math.round(latitude)  
+                serviceKey: process.env.KMA_API_KEY,
+                pageNo: 1,
+                numOfRows: 100,
+                dataType: 'JSON',
+                base_date: getBaseDate(), // 기준 날짜
+                base_time: getBaseTime(), // 기준 시간
+                nx: Math.round(longitude), // X 좌표 (정수값)
+                ny: Math.round(latitude)  // Y 좌표 (정수값)
             }
         });
 
-        if (response.data.response.body.items.item) {
-            return response.data.response.body.items.item; // 날씨 데이터 반환
-        } else {
-            console.error('날씨 데이터가 비어 있습니다:', response.data);
-            return null;
-        }
+        const weatherData = response.data.response.body.items.item;
+
+        // 필요한 카테고리만 필터링
+        const filteredData = weatherData.filter(item =>
+            ['T1H', 'RN1', 'SKY'].includes(item.category)
+        );
+
+        // 카테고리별로 정리된 데이터를 반환
+        const formattedData = {};
+        filteredData.forEach(item => {
+            formattedData[item.category] = {
+                baseDate: item.baseDate,
+                baseTime: item.baseTime,
+                fcstDate: item.fcstDate,
+                fcstTime: item.fcstTime,
+                value: item.fcstValue,
+                nx: item.nx,
+                ny: item.ny
+            };
+        });
+
+        return formattedData;
     } catch (error) {
-        console.error('날씨 데이터 요청 실패:', error.message);
+        console.error('날씨 데이터 요청 실패:', error.response ? error.response.data : error.message);
         return null;
     }
 };
+
+// 날짜와 시간 계산 함수
+const getBaseDate = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - 30); // 데이터 갱신 기준
+    return now.toISOString().slice(0, 10).replace(/-/g, '');
+};
+
+const getBaseTime = () => {
+    const now = new Date();
+    const hour = now.getHours();
+    const minutes = now.getMinutes();
+
+    // 30분 단위로 기준 시간 설정
+    if (minutes < 30) {
+        return String(hour - 1).padStart(2, '0') + '30';
+    }
+    return String(hour).padStart(2, '0') + '30';
+};
+
 
 // 경로 정보 요청 처리 함수
 const getRouteInfoWithKakao = async (req, res) => {
@@ -192,7 +232,8 @@ const getRouteInfoWithKakao = async (req, res) => {
                         },
                         mapUrl: generateMapUrl(closestRestArea1.yValue, closestRestArea1.xValue, closestRestArea1.unitName)
                     },
-                    weather: weather1
+                    weather: weather1,
+                    intermediatePointMapUrl: generateIntermediatePointMapUrl(point1.latitude, point1.longitude)  // 1/3 지점 표시
                 },
                 {
                     ...point2,
@@ -204,23 +245,21 @@ const getRouteInfoWithKakao = async (req, res) => {
                         },
                         mapUrl: generateMapUrl(closestRestArea2.yValue, closestRestArea2.xValue, closestRestArea2.unitName)
                     },
-                    weather: weather2
+                    weather: weather2,
+                    intermediatePointMapUrl: generateIntermediatePointMapUrl(point2.latitude, point2.longitude)  // 2/3 지점 표시
                 }
             ],
-            destinationWeather: {
-                coordinates: {
-                    latitude: endPoint.latitude,
-                    longitude: endPoint.longitude
-                },
-                weather: destinationWeather
-            }
+            destinationWeather,
+            mapUrl: generateMapUrl(endPoint.latitude, endPoint.longitude)
         };
 
-        res.status(200).json(routeInfo);
+        return res.status(200).json(routeInfo);
     } catch (error) {
-        console.error('경로 정보 요청 실패:', error.message);
-        res.status(500).json({ message: '경로 정보를 가져오는 데 실패했습니다.', error: error.message });
+        console.error('경로 정보 요청 처리 중 오류:', error.message);
+        return res.status(500).json({ message: error.message });
     }
 };
 
-module.exports = { getRouteInfoWithKakao };
+module.exports = {
+    getRouteInfoWithKakao
+};
