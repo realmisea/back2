@@ -222,7 +222,6 @@ const getRouteInfoWithKakao = async (req, res) => {
             endPoint,
             intermediatePoints: [
                 {
-                    ...point1,
                     restArea: {
                         name: closestRestArea1.unitName,
                         coordinates: {
@@ -235,7 +234,6 @@ const getRouteInfoWithKakao = async (req, res) => {
                     intermediatePointMapUrl: generateIntermediatePointMapUrl(closestRestArea1.yValue, closestRestArea1.xValue)  // 1/3 지점
                 },
                 {
-                    ...point2,
                     restArea: {
                         name: closestRestArea2.unitName,
                         coordinates: {
@@ -258,7 +256,6 @@ const getRouteInfoWithKakao = async (req, res) => {
         return res.status(500).json({ message: error.message });
     }
 };
-
 
 module.exports = {
     getRouteInfoWithKakao
