@@ -14,6 +14,45 @@ const generateDirectionsUrl = (latitude, longitude, name = '') => {
         : `https://map.kakao.com/link/to/${latitude},${longitude}`;
 };
 
+// 카카오 길찾기 API 요청 함수
+const fetchDrivingRoute = async (start, end) => {
+    try {
+        const response = await axios.get('https://apis-navi.kakaomobility.com/v1/directions', {
+            params: {
+                origin: `${start.longitude},${start.latitude}`, // 출발지 좌표
+                destination: `${end.longitude},${end.latitude}`, // 도착지 좌표
+                waypoints: '', // 경유지 좌표(없으면 빈 문자열)
+                priority: 'RECOMMEND' // 추천 경로 (자동차 경로를 고려)
+            },
+            headers: {
+                Authorization: `KakaoAK ${process.env.KAKAO_REST_API_KEY}` // 카카오 API 키
+            }
+        });
+
+        // 카카오 길찾기 API 응답 확인
+        console.log('카카오 길찾기 API 응답:', response.data);
+
+        // 경로가 존재하는지 확인
+        const routes = response.data.routes;
+        if (!routes || routes.length === 0) {
+            throw new Error("경로 정보를 찾을 수 없습니다.");
+        }
+
+        const route = routes[0];
+        const sections = route.sections;
+
+        // sections가 존재하지 않으면 오류 처리
+        if (!sections || sections.length === 0) {
+            throw new Error("경로의 섹션 정보를 찾을 수 없습니다.");
+        }
+
+        return route; // sections를 사용해 경로를 나누어 추가적인 처리 가능
+    } catch (error) {
+        console.error('카카오 길찾기 API 요청 오류:', error.message);
+        throw new Error('카카오 길찾기 API 호출에 실패했습니다.');
+    }
+};
+
 // 1/3, 2/3 지점 계산 함수
 const calculateIntermediatePoints = (start, end) => {
     const latitudeDiff = end.latitude - start.latitude;
@@ -31,7 +70,6 @@ const calculateIntermediatePoints = (start, end) => {
     ];
 };
 
-
 // 두 지점 간의 거리 계산 함수
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371; // 지구 반지름 (km)
@@ -46,7 +84,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 // 휴게소 데이터 가져오기
-const getRestAreas = async (point, retries = 3) => {
+const getRestAreas = async (retries = 3) => {
     let restAreas = [];
     for (let page = 1; page <= retries; page++) {
         try {
@@ -66,6 +104,7 @@ const getRestAreas = async (point, retries = 3) => {
             console.error(`페이지 ${page} 요청 실패:`, error.message);
         }
     }
+
     return restAreas;
 };
 
@@ -75,7 +114,6 @@ const findClosestRestArea = (restAreas, point, exclude = null) => {
     let minDistance = Infinity;
 
     restAreas.forEach(restArea => {
-        // 중복 방지: 이전에 선택된 휴게소는 제외
         if (exclude && restArea.unitName === exclude.unitName) {
             return;
         }
@@ -105,6 +143,13 @@ const getRouteInfoWithKakao = async (req, res) => {
     }
 
     try {
+        // 카카오 길찾기 API 경로 가져오기
+        const drivingRoute = await fetchDrivingRoute(startPoint, endPoint);
+
+        // sections 정보 확인
+        const sections = drivingRoute.sections;
+        console.log('경로 sections:', sections); // 디버깅용 로그 추가
+
         // 1/3, 2/3 지점 계산
         const [point1, point2] = calculateIntermediatePoints(startPoint, endPoint);
 
@@ -119,6 +164,7 @@ const getRouteInfoWithKakao = async (req, res) => {
         const routeInfo = {
             startPoint,
             endPoint,
+            drivingRoute, // 카카오 길찾기 API에서 반환된 도로 경로
             intermediatePoints: [
                 {
                     ...point1,
