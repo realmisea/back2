@@ -14,6 +14,7 @@ app.use(
         origin: [
             'https://localhost:5173',
             'http://localhost:5173',
+            'https://front-end-j1f4.vercel.app',
             // 'https://localhost:3000',
             // 'https://fierce-jerrilee-realmisea-3853df29.koyeb.app',
         ],
